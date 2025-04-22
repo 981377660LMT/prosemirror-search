@@ -1,3 +1,13 @@
+## 1.1.0 (2025-04-22)
+
+### Bug fixes
+
+Fix another issue in regular expression replacement content reuse.
+
+### New features
+
+`SearchResult` objects now have a `matchStart` property indicating where the node that it matches against starts.
+
 ## 1.0.0 (2024-07-14)
 
 ### New Features
