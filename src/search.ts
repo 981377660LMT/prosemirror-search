@@ -1,54 +1,73 @@
-import {Command, Plugin, PluginKey, TextSelection, EditorState, Transaction} from "prosemirror-state"
-import {DecorationSet, Decoration} from "prosemirror-view"
+import {
+  Command,
+  Plugin,
+  PluginKey,
+  TextSelection,
+  EditorState,
+  Transaction
+} from 'prosemirror-state'
+import { DecorationSet, Decoration } from 'prosemirror-view'
 
-import {SearchQuery, SearchResult} from "./query"
-export {SearchQuery, SearchResult}
+import { SearchQuery, SearchResult } from './query'
+export { SearchQuery, SearchResult }
 
 class SearchState {
   constructor(
     readonly query: SearchQuery,
-    readonly range: {from: number, to: number} | null,
+    readonly range: { from: number; to: number } | null,
     readonly deco: DecorationSet
   ) {}
 }
 
-function buildMatchDeco(state: EditorState, query: SearchQuery, range: {from: number, to: number} | null) {
+function buildMatchDeco(
+  state: EditorState,
+  query: SearchQuery,
+  range: { from: number; to: number } | null
+) {
   if (!query.valid) return DecorationSet.empty
   let deco: Decoration[] = []
   let sel = state.selection
-  for (let pos = range ? range.from : 0, end = range ? range.to : state.doc.content.size;;) {
+  for (let pos = range ? range.from : 0, end = range ? range.to : state.doc.content.size; ; ) {
     let next = query.findNext(state, pos, end)
     if (!next) break
-    let cls = next.from == sel.from && next.to == sel.to ? "ProseMirror-active-search-match" : "ProseMirror-search-match"
-    deco.push(Decoration.inline(next.from, next.to, {class: cls}))
+    let cls =
+      next.from == sel.from && next.to == sel.to
+        ? 'ProseMirror-active-search-match'
+        : 'ProseMirror-search-match'
+    deco.push(Decoration.inline(next.from, next.to, { class: cls }))
     pos = next.to
   }
   return DecorationSet.create(state.doc, deco)
 }
 
-const searchKey: PluginKey<SearchState> = new PluginKey("search")
+const searchKey: PluginKey<SearchState> = new PluginKey('search')
 
 /// Returns a plugin that stores a current search query and searched
 /// range, and highlights matches of the query.
-export function search(options: {initialQuery?: SearchQuery, initialRange?: {from: number, to: number}} = {}): Plugin {
+export function search(
+  options: { initialQuery?: SearchQuery; initialRange?: { from: number; to: number } } = {}
+): Plugin {
   return new Plugin<SearchState>({
     key: searchKey,
     state: {
       init(_config, state) {
-        let query = options.initialQuery || new SearchQuery({search: ""})
+        let query = options.initialQuery || new SearchQuery({ search: '' })
         let range = options.initialRange || null
         return new SearchState(query, range, buildMatchDeco(state, query, range))
       },
       apply(tr, search, _oldState, state) {
-        let set = tr.getMeta(searchKey) as {query: SearchQuery, range: {from: number, to: number} | null} | undefined
-        if (set) return new SearchState(set.query, set.range, buildMatchDeco(state, set.query, set.range))
+        let set = tr.getMeta(searchKey) as
+          | { query: SearchQuery; range: { from: number; to: number } | null }
+          | undefined
+        if (set)
+          return new SearchState(set.query, set.range, buildMatchDeco(state, set.query, set.range))
 
         if (tr.docChanged || tr.selectionSet) {
           let range = search.range
           if (range) {
             let from = tr.mapping.map(range.from, 1)
             let to = tr.mapping.map(range.to, -1)
-            range = from < to ? {from, to} : null
+            range = from < to ? { from, to } : null
           }
           search = new SearchState(search.query, range, buildMatchDeco(state, search.query, range))
         }
@@ -63,10 +82,12 @@ export function search(options: {initialQuery?: SearchQuery, initialRange?: {fro
 
 /// Get the current active search query and searched range. Will
 /// return `undefined` is the search plugin isn't active.
-export function getSearchState(state: EditorState): {
-  query: SearchQuery,
-  range: {from: number, to: number} | null
-} | undefined {
+export function getSearchState(state: EditorState):
+  | {
+      query: SearchQuery
+      range: { from: number; to: number } | null
+    }
+  | undefined {
   return searchKey.getState(state)
 }
 
@@ -79,23 +100,37 @@ export function getMatchHighlights(state: EditorState) {
 
 /// Add metadata to a transaction that updates the active search query
 /// and searched range, when dispatched.
-export function setSearchState(tr: Transaction, query: SearchQuery, range: {from: number, to: number} | null = null) {
-  return tr.setMeta(searchKey, {query, range})
+export function setSearchState(
+  tr: Transaction,
+  query: SearchQuery,
+  range: { from: number; to: number } | null = null
+) {
+  return tr.setMeta(searchKey, { query, range })
 }
 
-function nextMatch(search: SearchState, state: EditorState, wrap: boolean, curFrom: number, curTo: number) {
-  let range = search.range || {from: 0, to: state.doc.content.size}
+function nextMatch(
+  search: SearchState,
+  state: EditorState,
+  wrap: boolean,
+  curFrom: number,
+  curTo: number
+) {
+  let range = search.range || { from: 0, to: state.doc.content.size }
   let next = search.query.findNext(state, Math.max(curTo, range.from), range.to)
-  if (!next && wrap)
-    next = search.query.findNext(state, range.from, Math.min(curFrom, range.to))
+  if (!next && wrap) next = search.query.findNext(state, range.from, Math.min(curFrom, range.to))
   return next
 }
 
-function prevMatch(search: SearchState, state: EditorState, wrap: boolean, curFrom: number, curTo: number) {
-  let range = search.range || {from: 0, to: state.doc.content.size}
+function prevMatch(
+  search: SearchState,
+  state: EditorState,
+  wrap: boolean,
+  curFrom: number,
+  curTo: number
+) {
+  let range = search.range || { from: 0, to: state.doc.content.size }
   let prev = search.query.findPrev(state, Math.min(curFrom, range.to), range.from)
-  if (!prev && wrap)
-    prev = search.query.findPrev(state, range.to, Math.max(curTo, range.from))
+  if (!prev && wrap) prev = search.query.findPrev(state, range.to, Math.max(curTo, range.from))
   return prev
 }
 
@@ -103,8 +138,9 @@ function findCommand(wrap: boolean, dir: -1 | 1): Command {
   return (state, dispatch) => {
     let search = searchKey.getState(state)
     if (!search || !search.query.valid) return false
-    let {from, to} = state.selection
-    let next = dir > 0 ? nextMatch(search, state, wrap, from, to) : prevMatch(search, state, wrap, from, to)
+    let { from, to } = state.selection
+    let next =
+      dir > 0 ? nextMatch(search, state, wrap, from, to) : prevMatch(search, state, wrap, from, to)
     if (!next) return false
     let selection = TextSelection.create(state.doc, next.from, next.to)
     if (dispatch) dispatch(state.tr.setSelection(selection).scrollIntoView())
@@ -133,27 +169,31 @@ function replaceCommand(wrap: boolean, moveForward: boolean): Command {
   return (state, dispatch) => {
     let search = searchKey.getState(state)
     if (!search || !search.query.valid) return false
-    let {from} = state.selection
+    let { from } = state.selection
     let next = nextMatch(search, state, wrap, from, from)
     if (!next) return false
 
     if (!dispatch) return true
     if (state.selection.from == next.from && state.selection.to == next.to) {
-      let tr = state.tr, replacements = search.query.getReplacements(state, next)
+      let tr = state.tr,
+        replacements = search.query.getReplacements(state, next)
       for (let i = replacements.length - 1; i >= 0; i--) {
-        let {from, to, insert} = replacements[i]
+        let { from, to, insert } = replacements[i]
         tr.replace(from, to, insert)
       }
       let after = moveForward && nextMatch(search, state, wrap, next.from, next.to)
       if (after)
-        tr.setSelection(TextSelection.create(tr.doc, tr.mapping.map(after.from, 1), tr.mapping.map(after.to, -1)))
-      else
-        tr.setSelection(TextSelection.create(tr.doc, next.from, tr.mapping.map(next.to, 1)))
+        tr.setSelection(
+          TextSelection.create(tr.doc, tr.mapping.map(after.from, 1), tr.mapping.map(after.to, -1))
+        )
+      else tr.setSelection(TextSelection.create(tr.doc, next.from, tr.mapping.map(next.to, 1)))
       dispatch(tr.scrollIntoView())
-    } else if (!moveForward){
+    } else if (!moveForward) {
       return false
     } else {
-      dispatch(state.tr.setSelection(TextSelection.create(state.doc, next.from, next.to)).scrollIntoView())
+      dispatch(
+        state.tr.setSelection(TextSelection.create(state.doc, next.from, next.to)).scrollIntoView()
+      )
     }
     return true
   }
@@ -176,8 +216,9 @@ export const replaceCurrent = replaceCommand(false, false)
 export const replaceAll: Command = (state, dispatch) => {
   let search = searchKey.getState(state)
   if (!search) return false
-  let matches: SearchResult[] = [], range = search.range || {from: 0, to: state.doc.content.size}
-  for (let pos = range.from;;) {
+  let matches: SearchResult[] = [],
+    range = search.range || { from: 0, to: state.doc.content.size }
+  for (let pos = range.from; ; ) {
     let next = search.query.findNext(state, pos, range.to)
     if (!next) break
     matches.push(next)
@@ -189,7 +230,7 @@ export const replaceAll: Command = (state, dispatch) => {
       let match = matches[i]
       let replacements = search.query.getReplacements(state, match)
       for (let j = replacements.length - 1; j >= 0; j--) {
-        let {from, to, insert} = replacements[j]
+        let { from, to, insert } = replacements[j]
         tr.replace(from, to, insert)
       }
     }
